@@ -1,0 +1,23 @@
+# Phase 1 placeholder — OpenTelemetry collector is wired in Phase 17.
+# Kept as a minimal valid config so the topology decision is recorded.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

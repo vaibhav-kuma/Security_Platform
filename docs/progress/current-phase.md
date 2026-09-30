@@ -6,37 +6,48 @@ _Last updated: 2026-09-30_
 
 | Item | State |
 |---|---|
-| Completed phases | None (no code, migrations, CI, or git history exist) |
-| Current phase | **Phase 0 — architecture & engineering specification** |
-| Phase 0 progress | Architecture documentation set delivered (see below) |
-| Next phase | **Phase 1** — development & infrastructure foundation |
+| Completed phases | Phase 0 (architecture spec), Phase 1 (dev environment & DevOps foundation) |
+| Current phase | **Phase 2 — PostgreSQL domain model & migrations** |
+| Next phase | Phase 3 — authN/authZ & RBAC |
 
-## Phase 0 Deliverables (this repository)
+## Phase 1 Outcome (completed 2026-09-30)
 
-- `docs/architecture/ARCHITECTURE.md` — vision, personas, core workflow, system architecture, monorepo layout, MVP/V1/V2/future classification
-- `docs/architecture/COMPONENTS.md` — component catalog and major interfaces
-- `docs/architecture/DATA_FLOW.md` — runtime data flows (setup, scan pipeline, events, analysis, APK, reporting, knowledge packs)
-- `docs/architecture/TRUST_BOUNDARIES.md` — boundary catalog and security invariants
-- `docs/architecture/TECHNOLOGY_DECISIONS.md` — mandated stack + open decisions
-- `docs/architecture/PHASE_DEPENDENCIES.md` — Phase 0–20 dependency graph, migration hazards, ambiguity register, roadmap
-- `docs/progress/current-phase.md` — this file
+- Monorepo skeleton: `apps/` (backend, frontend), `infrastructure/`, `scripts/`, `docs/`.
+- Backend: FastAPI app factory (`app/main.py`), health endpoints, Pydantic settings
+  (`app/config.py`), SQLAlchemy engine/session scaffolding (`app/db/session.py`),
+  Alembic skeleton (no migrations yet), Makefile, `pyproject.toml` with ruff/mypy/pytest config.
+- Frontend: Next.js 15 + React 19 + TypeScript + Tailwind + shadcn/ui scaffolding.
+- Docker Compose: postgres, redis, minio, backend, worker placeholder, frontend,
+  prometheus/grafana under `observability` profile. Healthchecks on core services.
+- CI (`.github/workflows/ci.yml`): backend lint/format/typecheck/tests/audit,
+  frontend lint/typecheck/format/build/audit.
+- Tooling: `.pre-commit-config.yaml`, `.env.example` (root + backend), `scripts/dev-up.sh`.
+- Verified: `pytest` 5/5 pass, `ruff check` + `ruff format --check` clean, `mypy app` clean,
+  `docker compose` validated with Compose v5.5.1.
+- Docs: `docs/LOCAL_DEV.md`.
 
-## Open Items Before Phase 1
+## Phase 2 Scope (in progress)
 
-1. Restore `docs/PROJECT_MASTER_PROMPT.md` (declared source of truth in CLAUDE.md; currently missing — ambiguity A1).
-2. Review the ambiguity register in `PHASE_DEPENDENCIES.md` §3.
-3. Verify local prerequisites for Phase 1: Docker + Docker Compose, CI host (GitHub Actions), Node.js + Python 3.12 toolchains.
+Per `docs/phases/phase-02.md`:
 
-## Phase 1 Entry Checklist
+- SQLAlchemy domain model covering identity/RBAC, projects/scopes, asset graph
+  (domain/subdomain/IP/port/URL/endpoint/technology/certificate), scans/jobs/events,
+  methodology engine, detection rules, observations/findings/evidence (Observation and
+  Finding remain separate tables; severity and confidence remain separate fields),
+  API assets, APK assets, reports, audit logs, security events.
+- UUID PKs, FKs, indexes, unique constraints, timestamps, soft delete, native PG enums.
+- Alembic migration(s) generated from metadata; fresh-DB-from-zero verification.
+- Repository abstractions + database tests; seed data for permissions/system roles.
 
-- [ ] Monorepo skeleton: `apps`, `workers`, `packages`, `rules`, `infrastructure`, `docs`, `scripts`, `tests`
-- [ ] Docker services: frontend, backend, PostgreSQL, Redis, MinIO, worker infrastructure
-- [ ] `.env.example` (secure defaults), environment handling for dev/test/prod
-- [ ] CI: lint, format, static typing, unit tests, integration tests, dependency checks, build validation
-- [ ] Observability placeholders: Prometheus, Grafana, OpenTelemetry
-- [ ] One-command local startup, documented
-- [ ] **No scanning engine in Phase 1** (per phase-01.md)
+## Phase 2 Invariants (from architecture docs)
+
+- Observation ≠ Finding (distinct tables, promotion link only).
+- Severity ⟂ confidence (independent enums).
+- Scope status enum: `in_scope | out_of_scope | unknown | third_party`.
+- Finding status enum: `open | needs_review | confirmed | false_positive | duplicate | accepted_risk | resolved`.
+- Evidence storage must be extensible for the redaction pipeline (Phase 9+).
+- Scope snapshots stored as versioned payloads.
 
 ## Decision Log
 
-Architecture decisions should be recorded in `docs/decisions/` as they are made (first candidates: queue library choice, WSTG version pin — see ambiguity register A2/A4).
+Record decisions in `docs/decisions/` as they are made.
