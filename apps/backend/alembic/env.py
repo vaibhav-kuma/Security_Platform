@@ -1,16 +1,25 @@
 """Alembic environment.
 
 Migration convention (Phase 2 onward): append-only migrations, never rewrite
-history. ``target_metadata`` is populated once SQLAlchemy models exist.
+history. ``target_metadata`` comes from the model package so autogenerate
+sees every registered table.
 """
 
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from app.config import get_settings
+from app.models import Base
 
 config = context.config
 
-target_metadata = None  # replaced by model Base.metadata in Phase 2
+# Always drive migrations from application settings so the DSN has a single
+# source of truth (environment variables / .env), never a stale ini value.
+# ConfigParser treats percent signs as interpolation markers.  Passwords may
+# legitimately contain them, so escape them before handing the URL to Alembic.
+config.set_main_option("sqlalchemy.url", get_settings().postgres_dsn.replace("%", "%%"))
+
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
