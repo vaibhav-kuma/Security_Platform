@@ -7,7 +7,10 @@ from app.api.v1 import (
     apk,
     dynamic,
     findings,
+    graph,
+    knowledge,
     organizations,
+    plugins,
     projects,
     scans,
     scope_evaluation,
@@ -34,4 +37,7 @@ api_router.include_router(findings.obs_router)
 api_router.include_router(findings.corr_router)
 api_router.include_router(findings.review_router)
 api_router.include_router(findings.cvss_router)
+api_router.include_router(plugins.router)
+api_router.include_router(knowledge.router)
+api_router.include_router(graph.router)
 api_router.include_router(reports_router)

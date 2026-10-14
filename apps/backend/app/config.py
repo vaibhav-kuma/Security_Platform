@@ -67,8 +67,9 @@ class Settings(BaseSettings):
             return []
         origins = [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
         # Validate each origin is a valid URL with proper host
-        from pydantic import HttpUrl
         import re
+
+        from pydantic import HttpUrl
         validated = []
         for origin in origins:
             try:
@@ -84,6 +85,35 @@ class Settings(BaseSettings):
                 import logging
                 logging.getLogger(__name__).warning(f"Invalid CORS origin skipped: {origin}")
         return validated
+
+    # Worker settings
+    worker_max_concurrent_jobs: int = Field(default=4, alias="WORKER_MAX_CONCURRENT_JOBS")
+    worker_concurrency: int = Field(default=4, alias="WORKER_CONCURRENCY")
+    scan_job_timeout_minutes: int = Field(default=60, alias="SCAN_JOB_TIMEOUT_MINUTES")
+    worker_heartbeat_interval_seconds: int = Field(default=30, alias="WORKER_HEARTBEAT_INTERVAL_SECONDS")
+    worker_offline_timeout_seconds: int = Field(default=120, alias="WORKER_OFFLINE_TIMEOUT_SECONDS")
+
+    # Observability settings
+    otlp_endpoint: str | None = Field(default=None, alias="OTLP_ENDPOINT")
+    prometheus_metrics_enabled: bool = Field(default=True, alias="PROMETHEUS_METRICS_ENABLED")
+    tracing_enabled: bool = Field(default=True, alias="TRACING_ENABLED")
+    log_json_format: bool = Field(default=False, alias="LOG_JSON_FORMAT")
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+
+    # Artifact lifecycle settings
+    artifact_retention_days: int = Field(default=30, alias="ARTIFACT_RETENTION_DAYS")
+    artifact_cleanup_schedule_cron: str = Field(default="0 2 * * *", alias="ARTIFACT_CLEANUP_SCHEDULE_CRON")  # Daily at 2 AM
+
+    # Rate limiting - per project/target
+    max_concurrent_scans_per_project: int = Field(default=3, alias="MAX_CONCURRENT_SCANS_PER_PROJECT")
+    max_concurrent_scans_per_target: int = Field(default=1, alias="MAX_CONCURRENT_SCANS_PER_TARGET")
+
+    # Plugin settings
+    plugin_enabled: bool = Field(default=True, alias="PLUGIN_ENABLED")
+    plugin_directory: str = Field(default="./plugins/installed", alias="PLUGIN_DIRECTORY")
+    plugin_permission_policy: str = Field(default="allow_safe", alias="PLUGIN_PERMISSION_POLICY")
+    plugin_max_concurrent_executions: int = Field(default=10, alias="PLUGIN_MAX_CONCURRENT_EXECUTIONS")
+    plugin_default_timeout_seconds: int = Field(default=300, alias="PLUGIN_DEFAULT_TIMEOUT_SECONDS")
 
     def __init__(self, **data):
         super().__init__(**data)

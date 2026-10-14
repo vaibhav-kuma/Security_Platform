@@ -7,7 +7,6 @@ Alembic migration chain.
 """
 
 from collections.abc import Iterator
-from functools import lru_cache
 from typing import Any
 
 from sqlalchemy import create_engine
@@ -16,10 +15,22 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.config import get_settings
 
 
-def get_engine() -> Any:
+def get_engine(**kwargs: Any) -> Any:
     """Return the process-scoped engine. Not cached to allow worker reinitialization."""
     settings = get_settings()
-    return create_engine(settings.postgres_dsn, pool_pre_ping=True)
+
+    # Default pool settings for production worker scaling
+    pool_kwargs = {
+        "pool_pre_ping": True,
+        "pool_size": kwargs.pop("pool_size", 10),
+        "max_overflow": kwargs.pop("max_overflow", 20),
+        "pool_timeout": kwargs.pop("pool_timeout", 30),
+        "pool_recycle": kwargs.pop("pool_recycle", 3600),  # 1 hour
+        "pool_pre_ping": True,
+    }
+    pool_kwargs.update(kwargs)
+
+    return create_engine(settings.postgres_dsn, **pool_kwargs)
 
 
 def make_session_factory(engine: Any) -> sessionmaker[Session]:
@@ -39,6 +50,4 @@ def get_db() -> Iterator[Session]:
 # Kept as a small compatibility wrapper for callers that need the application
 # engine.  Engine construction itself remains cached and process-scoped.
 def make_engine(**kwargs: Any) -> Any:
-    if kwargs:
-        return create_engine(get_settings().postgres_dsn, pool_pre_ping=True, **kwargs)
-    return get_engine()
+    return get_engine(**kwargs)

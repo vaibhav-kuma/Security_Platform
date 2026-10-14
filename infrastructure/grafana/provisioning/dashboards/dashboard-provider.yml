@@ -1,0 +1,13 @@
+# Phase 17 Grafana dashboard provisioning
+apiVersion: 1
+
+providers:
+  - name: 'SASP Dashboards'
+    orgId: 1
+    folder: 'SASP'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

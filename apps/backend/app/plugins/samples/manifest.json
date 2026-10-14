@@ -1,0 +1,70 @@
+{
+  "name": "safe-recon-plugin",
+  "version": "1.0.0",
+  "description": "A safe demonstration recon plugin that performs basic domain enumeration using DNS queries. This plugin demonstrates the full SDK lifecycle including manifest validation, permission handling, and secure execution.",
+  "author": "SASP Team",
+  "license": "MIT",
+  "homepage": "https://github.com/sasp/plugins",
+  "repository": "https://github.com/sasp/plugins/tree/main/safe-recon-plugin",
+  "category": "recon",
+  "tags": ["dns", "recon", "demo", "safe"],
+  "min_core_version": "0.1.0",
+  "max_core_version": "1.0.0",
+  "python_version": ">=3.12",
+  "capabilities": [
+    "dns_enumeration",
+    "subdomain_discovery",
+    "record_retrieval"
+  ],
+  "permissions": [
+    "network.request"
+  ],
+  "resource_limits": {
+    "cpu_percent": 25,
+    "memory_mb": 128,
+    "time_seconds": 60,
+    "network_egress_allowlist": [
+      "8.8.8.8:53",
+      "1.1.1.1:53",
+      "*.google.com:53",
+      "*.cloudflare.com:53"
+    ]
+  },
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "dns_servers": {
+        "type": "array",
+        "items": {"type": "string"},
+        "default": ["8.8.8.8", "1.1.1.1"],
+        "description": "DNS servers to use for queries"
+      },
+      "query_types": {
+        "type": "array",
+        "items": {"type": "string", "enum": ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA"]},
+        "default": ["A", "AAAA", "CNAME"],
+        "description": "DNS record types to query"
+      },
+      "timeout_seconds": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 30,
+        "default": 5,
+        "description": "DNS query timeout in seconds"
+      },
+      "max_subdomains": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000,
+        "default": 50,
+        "description": "Maximum subdomains to enumerate"
+      }
+    },
+    "required": []
+  },
+  "entry_point": "safe_recon_plugin.SafeReconPlugin",
+  "dependencies": [
+    "dnspython>=2.6.0"
+  ],
+  "checksum": null
+}
