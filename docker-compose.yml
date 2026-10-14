@@ -1,3 +1,4 @@
+# docker-compose.yml
 # Authorized Security Assessment Platform — local development stack.
 # One-command startup: ./scripts/dev-up.sh  (see docs/LOCAL_DEV.md)
 #
@@ -70,6 +71,16 @@ services:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
       MINIO_ENDPOINT: minio:9000
+      # Phase 17 observability
+      OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+      PROMETHEUS_METRICS_ENABLED: "true"
+      TRACING_ENABLED: "true"
+      LOG_JSON_FORMAT: "true"
+      LOG_LEVEL: "INFO"
+      # Worker settings
+      WORKER_MAX_CONCURRENT_JOBS: "4"
+      WORKER_CONCURRENCY: "4"
+      SCAN_JOB_TIMEOUT_MINUTES: "60"
     ports:
       - "8000:8000"
     depends_on:
@@ -80,9 +91,13 @@ services:
       minio:
         condition: service_healthy
     networks: [backend_net, frontend_net]
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
 
-  # Phase 7 placeholder: shares the backend image. A real worker runtime
-  # (queue consumer, isolation, resource limits) is implemented in Phase 7.
+  # Phase 7+: Real worker with queue consumer, isolation, resource limits
   worker:
     build:
       context: ./apps/backend
@@ -94,13 +109,53 @@ services:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
       MINIO_ENDPOINT: minio:9000
-    command: ["python", "-c", "import time; print('worker placeholder (Phase 7)'); time.sleep(3600)"]
+      # Phase 17 observability
+      OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+      PROMETHEUS_METRICS_ENABLED: "true"
+      TRACING_ENABLED: "true"
+      LOG_JSON_FORMAT: "true"
+      LOG_LEVEL: "INFO"
+      # Worker settings
+      WORKER_MAX_CONCURRENT_JOBS: "4"
+      WORKER_CONCURRENCY: "4"
+      SCAN_JOB_TIMEOUT_MINUTES: "60"
+    command: ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info", "--queues=priority,scans,maintenance", "--concurrency=4", "--max-tasks-per-child=100", "--max-memory-per-child=500000"]
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     networks: [backend_net]
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+
+  # Celery beat scheduler for periodic tasks
+  worker-beat:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ./apps/backend/.env
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      MINIO_ENDPOINT: minio:9000
+    command: ["celery", "-A", "app.core.celery_app", "beat", "--loglevel=info", "--scheduler=celery.beat.PersistentScheduler"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [backend_net]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
 
   frontend:
     build:
@@ -115,13 +170,18 @@ services:
       - backend
     networks: [frontend_net]
 
-  # --- Observability placeholders (wired in Phase 17) ---
+  # --- Observability stack (Phase 17) ---
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
-    profiles: ["observability"]
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
     volumes:
       - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
     ports:
       - "9090:9090"
     networks: [backend_net]
@@ -129,13 +189,29 @@ services:
   grafana:
     image: grafana/grafana:latest
     restart: unless-stopped
-    profiles: ["observability"]
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me-dev-only}
+      GF_INSTALL_PLUGINS: "grafana-piechart-panel"
     volumes:
       - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
     ports:
       - "3001:3000"
+    depends_on:
+      - prometheus
+    networks: [backend_net]
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./infrastructure/otel/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8888:8888"   # Prometheus metrics
+      - "13133:13133" # Health check
     depends_on:
       - prometheus
     networks: [backend_net]
@@ -144,6 +220,8 @@ volumes:
   postgres_data:
   redis_data:
   minio_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   backend_net:

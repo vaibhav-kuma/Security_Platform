@@ -1,5 +1,6 @@
-# Phase 1 placeholder — OpenTelemetry collector is wired in Phase 17.
-# Kept as a minimal valid config so the topology decision is recorded.
+# Phase 17 OpenTelemetry Collector configuration
+# Receives traces from backend and workers, exports to Prometheus and Jaeger/Tempo
+
 receivers:
   otlp:
     protocols:
@@ -7,17 +8,137 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+  
+  # Prometheus receiver for scraping metrics from applications
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          static_configs:
+            - targets: ['localhost:8888']
+
+  # Host metrics receiver
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu: {}
+      memory: {}
+      disk: {}
+      network: {}
+      load: {}
+      filesystem: {}
+      paging: {}
+      processes: {}
 
 processors:
-  batch: {}
+  # Batch spans for efficient export
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+  
+  # Add resource attributes
+  resource:
+    attributes:
+      - key: "service.namespace"
+        value: "sasp"
+        action: "upsert"
+      - key: "deployment.environment"
+        value: "development"
+        action: "upsert"
+  
+  # Filter out health check spans
+  filter:
+    spans:
+      exclude:
+        match_type: "regexp"
+        services:
+          - "sasp-backend"
+        span_names:
+          - "^/health"
+          - "^/metrics"
+          - "^/favicon.ico"
+  
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  
+  # Tail sampling for production (keep errors, sample successes)
+  # tail_sampling:
+  #   decision_wait: 30s
+  #   num_traces: 50000
+  #   expected_new_traces_per_sec: 1000
+  #   policies:
+  #     - name: "error-policy"
+  #       type: "string_attribute"
+  #       string_attribute:
+  #         key: "http.status_code"
+  #         values: ["500", "502", "503", "504"]
+  #     - name: "slow-policy"
+  #       type: "latency"
+  #       latency:
+  #         threshold_ms: 1000
+  #     - name: "probabilistic-policy"
+  #       type: "probabilistic"
+  #       probabilistic:
+  #         sampling_percentage: 10
 
 exporters:
+  # Debug exporter for development
   debug:
-    verbosity: basic
+    verbosity: detailed
+    sampling_initial: 5
+    sampling_thereafter: 100
+  
+  # Prometheus exporter for metrics
+  prometheus:
+    endpoint: "0.0.0.0:8888"
+    namespace: "sasp"
+    const_labels:
+      cluster: "sasp-local"
+      environment: "development"
+  
+  # OTLP HTTP exporter to Tempo/Jaeger (if configured)
+  # otlphttp/tempo:
+  #   endpoint: "http://tempo:4318/v1/traces"
+  #   compression: gzip
+  
+  # OTLP gRPC exporter
+  # otlp/tempo:
+  #   endpoint: "tempo:4317"
+  #   compression: gzip
 
 service:
+  extensions: [health_check, pprof, zpages]
+  
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
-      exporters: [debug]
+      processors: [memory_limiter, batch, resource, filter]
+      exporters: [debug]  # Add otlphttp/tempo for production
+    
+    metrics:
+      receivers: [otlp, prometheus, hostmetrics]
+      processors: [memory_limiter, batch, resource]
+      exporters: [prometheus, debug]
+  
+  telemetry:
+    logs:
+      level: "info"
+    metrics:
+      level: "detailed"
+      address: "0.0.0.0:8888"
+
+  # Health check extension
+  health_check:
+    endpoint: "0.0.0.0:13133"
+
+  # Profiling endpoint
+  pprof:
+    endpoint: "0.0.0.0:1777"
+
+  # ZPages for debugging
+  zpages:
+    endpoint: "0.0.0.0:55679"
