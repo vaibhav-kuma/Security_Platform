@@ -14,11 +14,14 @@ class TargetCreate(BaseModel):
 
     name: Annotated[str, Field(min_length=1, max_length=512)]
     description: Annotated[str | None, Field(max_length=5000)] = None
-    scope_id: UUID | None = None
     target_type: Annotated[
-        ScopeRuleTargetType,
-        Field(description="Explicit target type for scope matching"),
-    ]
+        ScopeRuleTargetType | None,
+        Field(
+            description="Explicit target type for scope matching. "
+            "Auto-inferred from name format if not provided."
+        ),
+    ] = None
+    scope_id: UUID | None = None
 
 
 class TargetUpdate(BaseModel):
@@ -69,7 +72,6 @@ class TargetListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
-
 
 # Basic asset schemas
 class AssetResponse(BaseModel):

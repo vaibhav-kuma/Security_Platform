@@ -7,8 +7,8 @@ _Last updated: 2026-10-14_
 | Item | State |
 |---|---|
 | Completed phases | Phase 0 (architecture spec), Phase 1 (dev environment & DevOps foundation), Phase 2 (PostgreSQL domain model & migrations), Phase 3 (authN/authZ & RBAC), Phase 4 (Scope engine & target validation), Phase 5 (Frontend foundation), **Phase 12 (Security Analysis Engine)**, **Phase 17 (Scaling & Observability)**, **Phase 18 (Plugin Ecosystem)**, **Phase 19 (Security Knowledge Base)**, **Phase 20 (AssetGraph, RelationshipEngine, FindingGraph)** |
-| Current phase | **Phase 20 — Complete** |
-| Next phase | Phase 6 — Scanning engine foundation (or next sequential phase per project plan) |
+| Current phase | **Phase 7 — Scanning engine / dummy worker infrastructure** |
+| Next phase | Phase 8 — Reconnaissance engine (pending full build) |
 
 ## Phase 20 Outcome (completed 2026-10-14)
 

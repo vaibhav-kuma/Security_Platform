@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     api_security,
     apk,
+    authorization,
     dynamic,
     findings,
     graph,
@@ -29,6 +30,7 @@ api_router.include_router(scopes.router)
 api_router.include_router(targets.router)
 api_router.include_router(scans.router)
 api_router.include_router(scope_evaluation.router)
+api_router.include_router(authorization.router)
 api_router.include_router(api_security.router)
 api_router.include_router(apk.router)
 api_router.include_router(dynamic.router)

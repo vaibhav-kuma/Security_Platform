@@ -20,6 +20,7 @@ class TargetValidationService:
     1. Fetches active scopes and rules for a project
     2. Uses ScopeEngine to evaluate targets against rules
     3. Updates target.scope_status based on evaluation
+    4. Handles exclusion patterns and authorization checks
     """
 
     def __init__(self, session: Session) -> None:
@@ -237,6 +238,15 @@ class TargetValidationService:
                 other_rules = [r for r in all_rules if r not in specific_rules]
                 all_rules = list(specific_rules) + other_rules
 
+        # Handle exclusion patterns - filter out exclude rules
+        include_rules, is_excluded = self._handle_exclusion_patterns(
+            target, all_rules
+        )
+
+        if is_excluded:
+            target.scope_status = ScopeStatus.OUT_OF_SCOPE
+            return target
+
         # Determine target type - use stored type if available, otherwise infer
         if target.target_type:
             try:
@@ -251,7 +261,7 @@ class TargetValidationService:
         # Evaluate - use multiple types since a target could match different rule types
         status = self.engine.evaluate_multiple_types(
             target_value=target.name,
-            rules=all_rules,
+            rules=include_rules,
         )
 
         target.scope_status = status
@@ -299,6 +309,46 @@ class TargetValidationService:
 
         # Default to DOMAIN for anything else
         return ScopeRuleTargetType.DOMAIN
+
+    def _handle_exclusion_patterns(
+        self, target: Target, all_rules: list
+    ) -> list:
+        """Filter out exclusion patterns from the rule set.
+
+        Scope rules with effect='exclude' remove targets from scope.
+        This method separates exclude rules and returns only include rules
+        for evaluation, while tracking excluded patterns for reporting.
+        """
+        include_rules = []
+        exclude_rules = []
+
+        for rule in all_rules:
+            if rule.effect.value == "exclude":
+                exclude_rules.append(rule)
+            else:
+                include_rules.append(rule)
+
+        # Check if target matches any exclude pattern
+        for exclude_rule in exclude_rules:
+            if self._target_matches_pattern(target.name, exclude_rule.pattern):
+                # Target is excluded - mark as out of scope
+                return include_rules, True
+
+        return include_rules, False
+
+    @staticmethod
+    def _target_matches_pattern(target_name: str, pattern: str) -> bool:
+        """Check if a target name matches a scope rule pattern.
+
+        Supports simple wildcard (*) matching and exact matching.
+        """
+        import fnmatch
+
+        try:
+            return fnmatch.fnmatch(target_name, pattern)
+        except Exception:
+            # Fallback to exact match if pattern is invalid
+            return target_name == pattern
 
     def update_target_status_manually(
         self,

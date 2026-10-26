@@ -23,6 +23,7 @@ from app.schemas.scans import (
     ScanUpdate,
 )
 from app.services.scans import ScanExecutionService, create_scan_with_validation
+from app.services.target_validation import validate_target_for_scan
 
 router = APIRouter(prefix="/projects/{project_id}/scans", tags=["scans"])
 
@@ -45,6 +46,13 @@ def create_scan(
 
     Requires project membership.
     """
+    # Authorization gate: server-side scope validation is the ultimate authority
+    if data.target_id:
+        is_valid, error = validate_target_for_scan(db, project_id, data.target_id)
+        if not is_valid:
+            from app.core.exceptions import ForbiddenError
+            raise ForbiddenError(f"Scan authorization denied: {error}")
+
     scan = create_scan_with_validation(
         db=db,
         project_id=project_id,
